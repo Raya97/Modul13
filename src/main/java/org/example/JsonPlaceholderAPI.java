@@ -1,6 +1,10 @@
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
@@ -17,16 +21,14 @@ public class JsonPlaceholderAPI {
         JsonPlaceholderAPI api = new JsonPlaceholderAPI();
 
         try {
-            // Завдання 1
-            JSONObject newUser = new JSONObject();
-            newUser.put("id", 11);  // Приклад значення для id
-            newUser.put("username", "newUser123"); // Приклад значення для username
-            newUser.put("email", "newuser@example.com"); // Приклад значення для email
 
-            // Завдання 2
+            // Завдання 1: Створити нового користувача та отримати його ID
+            int newUserId = api.createNewUser("John Doe", "johndoe@example.com");
+
+            // Завдання 2: Отримати та зберегти коментарі для останнього поста користувача
             api.fetchAndSaveCommentsForLastPostOfUser(1);
 
-            // Завдання 3
+            // Завдання 3: Отримати та вивести список відкритих завдань для користувача
             JSONArray openTasks = api.getOpenTasksForUser(1);
             System.out.println("Open Tasks for User 1: " + openTasks);
 
@@ -35,26 +37,38 @@ public class JsonPlaceholderAPI {
         }
     }
 
-    // Решта методів класу JsonPlaceholderAPI
+    // Метод для завдання 1: Створити нового користувача та отримати його ID
+    public int createNewUser(String name, String email) throws IOException {
+        JSONObject newUser = new JSONObject();
+        newUser.put("name", name);
+        newUser.put("email", email);
 
+        HttpPost httpPost = new HttpPost(BASE_URL + "/users");
+        httpPost.setHeader("Content-Type", "application/json");
+        httpPost.setEntity(new StringEntity(newUser.toString(), ContentType.APPLICATION_JSON));
+
+        HttpClient httpClient = HttpClients.createDefault();
+        HttpResponse response = httpClient.execute(httpPost);
+
+        HttpEntity entity = response.getEntity();
+        String responseBody = EntityUtils.toString(entity);
+
+        JSONObject createdUser = new JSONObject(responseBody);
+        return createdUser.getInt("id");
+    }
+
+    // Метод для завдання 2: Отримати та зберегти коментарі для останнього поста користувача
     public void fetchAndSaveCommentsForLastPostOfUser(int userId) throws IOException {
-        String userPostsUrl = BASE_URL + "/users/" + userId + "/posts";
-        JSONArray userPosts = fetchJSONArray(userPostsUrl);
-
+        JSONArray userPosts = fetchJSONArray(BASE_URL + "/users/" + userId + "/posts");
         if (userPosts.length() > 0) {
             JSONObject lastPost = userPosts.getJSONObject(userPosts.length() - 1);
             int postId = lastPost.getInt("id");
-            String postCommentsUrl = BASE_URL + "/posts/" + postId + "/comments";
-            JSONArray postComments = fetchJSONArray(postCommentsUrl);
-
-            String fileName = "user-" + userId + "-post-" + postId + "-comments.json";
-            saveJSONArrayToFile(postComments, fileName);
-        } else {
-            System.out.println("User has no posts.");
+            JSONArray comments = fetchJSONArray(BASE_URL + "/posts/" + postId + "/comments");
+            saveJSONArrayToFile(comments, "user-" + userId + "-post-" + postId + "-comments.json");
         }
     }
 
-
+    // Метод для завдання 3: Отримати список відкритих завдань для користувача
     public JSONArray getOpenTasksForUser(int userId) throws IOException {
         String userTodosUrl = BASE_URL + "/users/" + userId + "/todos";
         JSONArray todos = fetchJSONArray(userTodosUrl);
@@ -67,10 +81,8 @@ public class JsonPlaceholderAPI {
             }
         }
 
-        return openTasks; // Повернення openTasks після циклу
+        return openTasks;
     }
-
-
 
     // Допоміжний метод для відправки GET-запиту і отримання JSON-масиву
     private JSONArray fetchJSONArray(String url) throws IOException {
@@ -89,16 +101,5 @@ public class JsonPlaceholderAPI {
             fileWriter.flush();
         }
         System.out.println("Comments saved to " + fileName);
-    }
-
-    public JSONObject getUserByUsername(String username) throws IOException {
-        String userByUsernameUrl = BASE_URL + "/users?username=" + username;
-        JSONArray usersArray = fetchJSONArray(userByUsernameUrl);
-
-        if (usersArray.length() > 0) {
-            return usersArray.getJSONObject(0);
-        } else {
-            throw new IOException("User with username " + username + " not found.");
-        }
     }
 }
